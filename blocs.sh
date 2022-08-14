@@ -36,19 +36,82 @@ cat > $name.php << EOF
  * Text Domain:       $name
  */
 
+namespace ${name}\Builder;
+
 defined( 'ABSPATH' ) || exit;
 
-function ${name}_create_blocks_init() {
-	register_block_type( __DIR__ . '/build' );
+/**
+ * Main class for builder
+ *
+ * @throws
+ */
+class ${name}Builder
+{
+	/**
+	 * Hooks
+	 */
+	public function __construct()
+	{
+		add_action( 'init', [ $this, 'builderInit' ] );
+		add_action( 'init', [ $this, 'adminAssets' ] );
+	}
+
+	/**
+	 * Register block types
+	 *
+	 * @return void
+	 */
+	public function builderInit(): void
+	{
+		register_block_type( __DIR__ . '/build/blocks/bloc1/' );
+	}
+
+	/**
+	 * Register and enqueue builder overrides script
+	 *
+	 * @return void
+	 */
+	public function adminAssets(): void
+	{
+		$editor_script = include plugin_dir_path( __FILE__ ) . 'build/overrides/index.asset.php';
+		wp_enqueue_script(
+			'${name}builder',
+			plugin_dir_url( __FILE__ ) . 'build/overrides/index.js',
+			$editor_script['dependencies'],
+			$editor_script['version'],
+			1.0,
+			true
+		);
+	}
+
+	public function blockStylesAssets(): void
+	{
+		wp_enqueue_script(
+			'${name}builder',
+			plugin_dir_url( __FILE__ ) . 'build/blockstyles/blockstyles.js',
+			array( 'wp-blocks', 'wp-dom' ),
+			wp_get_theme()->get( 'Version' ),
+			true
+		);
+	}
 }
-add_action( 'init', '${name}_create_blocks_init' );
+
+$builder = new ${name}Builder();
 EOF
 
 npm init -y
 npm i @wordpress/scripts --save-dev
+npm i @wordpress/blocks --save-dev
+npm i @wordpress/dom-ready --save-dev
 npm i browser-sync-webpack-plugin --save-dev
-npmAddScript -k build -v "wp-scripts build src/index.js"
-npmAddScript -k start -v "wp-scripts start src/index.js"
+npm i del-cli --save-dev
+npm i npm-run-all --save-dev
+npmAddScript -k build-blocks -v "wp-scripts build"
+npmAddScript -k build-overrides -v "wp-scripts build src/index.js --output-path=build/overrides"
+npmAddScript -k build -v "npm run build-blocks && npm run build-overrides && del-cli build/overrides/blocks"
+npmAddScript -k start-blocks -v "wp-scripts start"
+npmAddScript -k start-overrides -v "wp-scripts start src/index.js --output-path=build/overrides"
+npmAddScript -k start -v "npm-run-all --parallel start-blocks start-overrides"
 
 
 mkdir src && cd src
@@ -56,64 +119,24 @@ mkdir blocks && mkdir components && mkdir overrides && mkdir styles && mkdir var
 
 cat > index.js << EOF
 import './styles'
-import { registerBlockType, registerBlockVariation } from '@wordpress/blocks'
-import { __ } from '@wordpress/i18n'
-import { addFilter } from '@wordpress/hooks'
-import { filterBlockListBlock } from './overrides/filterBlockListBlock.js'
-import './overrides/unregisterFormatType.js'
-import './overrides/unregisterBlockStyle.js'
-    
-import * as block1 from './blocks/block1'
-
-/**
- * Blocks
- */
-const blocks = [
-	block1,
-]
-  
-const registerBlock = ( block ) => {
-	const { metadata, edit, save } = block.settings
-	registerBlockType( metadata, { edit, save } )
-}
-
-blocks.forEach( registerBlock )
-
-/**
- * Variations
- */
-const variations = [
-]
-
-const registerVariation = ( variation ) => {
-	const { metadata, edit, save } = variation.settings
-	registerBlockVariation( metadata, { edit, save } )
-}
-
-variations.forEach( registerVariation )
-
-/**
- * Filters
- */
-addFilter( 'editor.BlockListBlock', '$name', filterBlockListBlock )
-addFilter( 'blocks.registerBlockType', '$name', filterRegisterBlockType )
+import './overrides'
 EOF
 
-cd blocks && mkdir block1 && cd block1 && mkdir styles
+cd blocks && mkdir block1
 > edit.js
 > save.js
+> style.scss
+> editor.scss
 cat > index.js << EOF
-import './styles/editor.scss'
-import './styles/style.scss'
-import edit from './edit.js'
-import save from './save.js'
+import { registerBlockType } from '@wordpress/blocks'
+import './style.scss'
+import Edit from './edit'
+import save from './save'
 import metadata from './block.json'
-
-export const settings = {
-	metadata,
-	edit,
-	save
-}
+registerBlockType( metadata.name, {
+	edit: Edit,
+	save,
+} )
 EOF
 
 cat > block.json << EOF
@@ -128,8 +151,7 @@ cat > block.json << EOF
 	"description": "A new block",
 	"attributes": {},
 	"supports": {
-		"html": false,
-		"reusable":false
+		"html": false
 	},
 	"example":{},
 	"textdomain": "$name",
@@ -138,10 +160,6 @@ cat > block.json << EOF
 	"style": "file:./style-index.css"
 }
 EOF
-
-cd styles
-> editor.scss
-> style.scss
 
 cd $pwd/src/styles
 
@@ -153,58 +171,13 @@ import './style.scss'
 EOF
 
 cd $pwd/src/overrides
-cat > filterBlockListBlock.js << EOF
-import { createHigherOrderComponent } from '@wordpress/compose'
-  
-export const filterBlockListBlock = createHigherOrderComponent( ( BlockListBlock ) => {
-	return ( props ) => {
-
-		const { attributes } = props
-
-		if( attributes.hasOwnProperty('className') && '' !== attributes.className ) {
-			return <BlockListBlock { ...props } className={ attributes.className } />
-  		}
-  
-  		return <BlockListBlock {...props} />
-  	}
-}, 'filterBlockListBlock' )
-EOF
-
-cat > unregisterBlockStyle.js << EOF
-wp.domReady( () => {
-	// image
-	wp.blocks.unregisterBlockStyle('core/image', 'rounded')
-	wp.blocks.unregisterBlockStyle('core/image', 'default')
-	// quote
-	wp.blocks.unregisterBlockStyle('core/quote', 'default')
-	wp.blocks.unregisterBlockStyle('core/quote', 'large')
-	// button
-	wp.blocks.unregisterBlockStyle('core/button', 'fill')
-	wp.blocks.unregisterBlockStyle('core/button', 'outline')
-	// pullquote
-	wp.blocks.unregisterBlockStyle('core/pullquote', 'default')
-	wp.blocks.unregisterBlockStyle('core/pullquote', 'solid-color')
-	// separator
-	wp.blocks.unregisterBlockStyle('core/separator', 'default')
-	wp.blocks.unregisterBlockStyle('core/separator', 'wide')
-	wp.blocks.unregisterBlockStyle('core/separator', 'dots')
-	// table
-	wp.blocks.unregisterBlockStyle('core/table', 'regular')
-	wp.blocks.unregisterBlockStyle('core/table', 'stripes')
-	// social-links
-	wp.blocks.unregisterBlockStyle('core/social-links', 'default')
-	wp.blocks.unregisterBlockStyle('core/social-links', 'logos-only')
-	wp.blocks.unregisterBlockStyle('core/social-links', 'pill-shape')
-} )
-EOF
-
-cat > unregisterFormatType.js << EOF
-wp.domReady( () => {
-	// All blocks using RichText
-    wp.richText.unregisterFormatType( 'core/text-color' )
-	wp.richText.unregisterFormatType( 'core/code' )
-	wp.richText.unregisterFormatType( 'core/keyboard' )
-} )
+mkdir blockstyles
+cd blockstyles
+> registerBlockStyle.js
+> unregisterBlockStyle.js
+cat > index.js << EOF
+import './registerBlockStyle.js'
+import './unregisterBlockStyle.js'
 EOF
 
 cd $pwd
