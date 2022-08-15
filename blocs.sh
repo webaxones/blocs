@@ -122,7 +122,7 @@ import './styles'
 import './overrides'
 EOF
 
-cd blocks && mkdir block1
+cd blocks && mkdir block1 && cd block1
 > edit.js
 > save.js
 > style.scss
@@ -172,6 +172,9 @@ EOF
 
 cd $pwd/src/overrides
 mkdir blockstyles
+cat > index.js << EOF
+import './blockstyles'
+EOF
 cd blockstyles
 > registerBlockStyle.js
 > unregisterBlockStyle.js
