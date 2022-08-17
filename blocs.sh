@@ -106,6 +106,7 @@ npm i @wordpress/scripts --save-dev
 npm i @wordpress/blocks --save-dev
 npm i @wordpress/dom-ready --save-dev
 npm i browser-sync-webpack-plugin --save-dev
+npm i classnames --save-dev
 npm i del-cli --save-dev
 npm i npm-run-all --save-dev
 npmAddScript -k build-blocks -v "wp-scripts build"
