@@ -6,17 +6,19 @@ pwd=`pwd`
 
 cat > webpack.config.js << EOF
 const defaultConfig = require( '@wordpress/scripts/config/webpack.config' )
-const BrowserSyncPlugin = require('browser-sync-webpack-plugin')
+const path = require('path')
+
 module.exports = {
 	...defaultConfig,
-	plugins: [
-		...defaultConfig.plugins,
-		new BrowserSyncPlugin({
-			host: 'localhost',
-			port: 3000,
-			proxy: 'http://$name.local/'
-		})
-	]
+	resolve: {
+		alias: {
+		  Blocks: path.resolve( __dirname, 'src/blocks/' ),
+		  Components: path.resolve( __dirname, 'src/components/' ),
+		  Overrides: path.resolve( __dirname, 'src/overrides/' ),
+		  Styles: path.resolve( __dirname, 'src/styles/' ),
+		  Variations: path.resolve( __dirname, 'src/variations/' )
+		}
+	}
 }
 EOF
 
